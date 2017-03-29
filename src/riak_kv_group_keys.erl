@@ -149,7 +149,7 @@ content_folder_fun(Bucket, GroupParams, DbRef, FoldOpts, FoldFun, Acc) ->
 content_folder(Bucket, GroupParams, DbRef, FoldOpts, FoldFun, Acc) ->
     BackendMod = get_backend(GroupParams),
     FoldOpts1 = [{first_key, BackendMod:to_first_key({bucket, Bucket})} | FoldOpts],
-    try iterator_open(DbRef, FoldOpts1) of
+    try BackendMod:iterator_open(DbRef, FoldOpts1) of
         {ok, Itr} ->
             iterate(Bucket, GroupParams, Itr, FoldFun, Acc)
     catch Error ->
@@ -157,18 +157,10 @@ content_folder(Bucket, GroupParams, DbRef, FoldOpts, FoldFun, Acc) ->
               throw(Error)
     end.
 
-iterator_open(DbRef, FoldOpts) ->
-    eleveldb:iterator(DbRef, FoldOpts).
-
-iterator_close(Itr) ->
-    eleveldb:iterator_close(Itr).
-
-iterator_move(Itr, Pos) ->
-    eleveldb:iterator_move(Itr, Pos).
-
 iterate(Bucket, GroupParams, Itr, FoldFun, Acc) ->
     Outcome = enumerate(undefined, Bucket, GroupParams, Itr, FoldFun, Acc),
-    iterator_close(Itr),
+    BackendMod = get_backend(GroupParams),
+    BackendMod:iterator_close(Itr),
     case Outcome of
         {error, _Err} = Error ->
             throw(Error);
@@ -184,7 +176,7 @@ enumerate(PrevEntry, Bucket, GroupParams, Itr, FoldFun, Acc) ->
         npos ->
             Acc;
         _ ->
-            try iterator_move(Itr, Pos) of
+            try BackendMod:iterator_move(Itr, Pos) of
                 {error, invalid_iterator} ->
                     lager:debug( "invalid_iterator.  reached end.", []),
                     Acc;

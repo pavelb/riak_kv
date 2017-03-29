@@ -22,6 +22,7 @@
 
 -module(riak_kv_eleveldb_backend).
 -behavior(riak_kv_backend).
+-behavior(riak_kv_iterable_backend).
 
 %% KV Backend API
 -export([api_version/0,
@@ -40,7 +41,11 @@
          fold_indexes/4,
          is_empty/1,
          status/1,
-         callback/3]).
+         callback/3,
+         iterator_open/2,
+         iterator_open/3,
+         iterator_close/1,
+         iterator_move/2]).
 
 -export([data_size/1]).
 
@@ -282,6 +287,18 @@ fold_buckets(FoldBucketsFun, Acc, Opts, #state{fold_opts=FoldOpts,
             {ok, BucketFolder()}
     end.
 
+iterator_open(DbRef, ItrOpts) ->
+    eleveldb:iterator(DbRef, ItrOpts).
+
+iterator_open(DbRef, ItrOpts, keys_only) ->
+    eleveldb:iterator(DbRef, ItrOpts, keys_only).
+
+iterator_close(ItrRef) ->
+    eleveldb:iterator_close(ItrRef).
+
+iterator_move(ItrRef, ItrAction) ->
+    eleveldb:iterator_move(ItrRef, ItrAction).
+
 %%%% @private
 %%%% Return a function to fold over the buckets on this backend
 %% NOTE: There are some careful usages of `try...of` here
@@ -292,7 +309,7 @@ fold_buckets(FoldBucketsFun, Acc, Opts, #state{fold_opts=FoldOpts,
 %% try...catch to handle issues.
 bucket_folder_fun(DbRef, Opts, FoldBucketsFun, Acc) ->
     fun() ->
-        try eleveldb:iterator(DbRef, Opts, keys_only) of
+        try iterator_open(DbRef, Opts, keys_only) of
             {ok, Itr} ->
                 iterate_buckets(Itr, FoldBucketsFun, Acc)
         catch Error ->
@@ -303,7 +320,7 @@ bucket_folder_fun(DbRef, Opts, FoldBucketsFun, Acc) ->
 
 iterate_buckets(Itr, FoldBucketsFun, Acc) ->
     Outcome = fold_list_buckets(undefined, Itr, FoldBucketsFun, Acc),
-    eleveldb:iterator_close(Itr),
+    iterator_close(Itr),
     case Outcome of
         {error, _Err} = Error ->
             throw(Error);
@@ -317,7 +334,7 @@ fold_list_buckets(PrevBucket, Itr, FoldBucketsFun, Acc) ->
     lager:debug("fold_list_buckets prev=~p~n", [PrevBucket]),
     Seek = determine_next_bucket_seek(PrevBucket),
     _Opts = [], %% For object listing, use iterator_prefetch option
-    try eleveldb:iterator_move(Itr, Seek) of
+    try iterator_move(Itr, Seek) of
         {error, invalid_iterator} ->
             lager:debug( "DBG: NO_MORE_BUCKETS~n", []),
             Acc;
@@ -974,3 +991,4 @@ cleanup(_) ->
 -endif. % EQC
 
 -endif.
+
