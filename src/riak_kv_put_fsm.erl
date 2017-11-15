@@ -110,8 +110,7 @@
                 trace = false :: boolean(), 
                 tracked_bucket=false :: boolean(), %% track per bucket stats
                 bad_coordinators = [] :: [atom()],
-                coordinator_timeout :: integer()
-               }).
+                coordinator_timeout :: integegett               }).
 
 -include("riak_kv_dtrace.hrl").
 
@@ -343,7 +342,7 @@ prepare(timeout, StateData0 = #state{from = From, robj = RObj,
                                       [From,RObj,Options2]),
                         ?DTRACE(Trace, ?C_PUT_FSM_PREPARE, [2],
                                 ["prepare", atom2list(CoordNode)]),
-                        ok = riak_kv_stat:update(coord_redir),
+                        ok = riak_kv_stat:update(put_coord_redir),
                         monitor_remote_coordinator(UseAckP, MiddleMan,
                                                    CoordNode, StateData0)
                     catch
